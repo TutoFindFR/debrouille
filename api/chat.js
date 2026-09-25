@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     }
 
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/interactions",
       {
         method: "POST",
         headers: {
@@ -19,27 +19,18 @@ export default async function handler(req, res) {
           "x-goog-api-key": process.env.GEMINI_API_KEY,
         },
         body: JSON.stringify({
-          system_instruction: {
-            parts: [
-              {
-                text: `Tu es Débrouille, un assistant pratique du quotidien.
-
-Ton objectif est d'aider l'utilisateur à :
-1. comprendre son problème,
-2. décider quoi faire,
-3. passer à l'action.
-
-Réponds en français, simplement et concrètement.
-Évite le blabla.
-Ne prétends jamais avoir effectué une action que tu n'as pas réellement effectuée.`,
-              },
-            ],
+          model: "gemini-3.8-flash",
+          input: problem,
+          system_instruction:
+            "Tu es Débrouille, un assistant pratique du quotidien. " +
+            "Ton objectif est d'aider l'utilisateur à comprendre son problème, " +
+            "décider quoi faire et passer à l'action. " +
+            "Réponds en français, simplement et concrètement. " +
+            "Évite le blabla. Ne prétends jamais avoir effectué une action " +
+            "que tu n'as pas réellement effectuée.",
+          generation_config: {
+            thinking_level: "low",
           },
-          contents: [
-            {
-              parts: [{ text: problem }],
-            },
-          ],
         }),
       }
     );
@@ -52,12 +43,8 @@ Ne prétends jamais avoir effectué une action que tu n'as pas réellement effec
       );
     }
 
-    const answer =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Je n'ai pas réussi à générer une réponse.";
-
     return res.status(200).json({
-      answer,
+      answer: data.output_text || "Je n'ai pas réussi à générer une réponse.",
     });
   } catch (error) {
     console.error(error);
