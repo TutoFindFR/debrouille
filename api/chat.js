@@ -43,9 +43,18 @@ export default async function handler(req, res) {
       );
     }
 
-    return res.status(200).json({
-      answer: data.output_text || "Je n'ai pas réussi à générer une réponse.",
-    });
+    const answer =
+  data?.steps
+    ?.filter((step) => step.type === "model_output")
+    ?.flatMap((step) => step.content || [])
+    ?.filter((content) => content.type === "text")
+    ?.map((content) => content.text)
+    ?.join("\n")
+    ?.trim() || "Je n'ai pas réussi à générer une réponse.";
+
+return res.status(200).json({
+  answer,
+});
   } catch (error) {
     console.error(error);
 
