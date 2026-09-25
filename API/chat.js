@@ -40,7 +40,7 @@ Ne prétends jamais avoir effectué une action que tu n'as pas réellement effec
     console.error(error);
 
     return res.status(500).json({
-      error: "Impossible de contacter Débrouille.",
-    });
+  error: error.message || "Erreur inconnue",
+});
   }
 }

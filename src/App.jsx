@@ -8,62 +8,6 @@ const examples = [
   "Je veux trouver une solution moins chère...",
 ];
 
-const demoResponses = {
-  default: {
-    title: "J'ai compris ton problème.",
-    intro:
-      "Débrouille analyse ta situation et te propose les prochaines étapes les plus utiles.",
-    steps: [
-      "Comprendre exactement ce qui pose problème",
-      "Identifier les informations importantes",
-      "Choisir la meilleure action à faire maintenant",
-    ],
-  },
-  facture: {
-    title: "Ta facture mérite qu'on regarde ça.",
-    intro:
-      "Je peux t'aider à comprendre les montants, repérer une augmentation et préparer la suite.",
-    steps: [
-      "Comparer les différents montants",
-      "Repérer ce qui a changé",
-      "Préparer une demande d'explication si nécessaire",
-    ],
-  },
-  message: {
-    title: "On va éviter de répondre sous le coup de l'émotion.",
-    intro:
-      "Je peux reformuler ton message pour dire exactement ce que tu veux sans créer un conflit inutile.",
-    steps: [
-      "Comprendre ce que tu veux réellement dire",
-      "Retirer ce qui pourrait envenimer la situation",
-      "Préparer une réponse claire et efficace",
-    ],
-  },
-};
-
-function getResponse(text) {
-  const lower = text.toLowerCase();
-
-  if (
-    lower.includes("facture") ||
-    lower.includes("prix") ||
-    lower.includes("payer")
-  ) {
-    return demoResponses.facture;
-  }
-
-  if (
-    lower.includes("message") ||
-    lower.includes("répondre") ||
-    lower.includes("repondre") ||
-    lower.includes("sms")
-  ) {
-    return demoResponses.message;
-  }
-
-  return demoResponses.default;
-}
-
 function getActionContent(action, problem) {
   const lower = problem.toLowerCase();
 
@@ -202,6 +146,7 @@ function App() {
   const [savedReminder, setSavedReminder] = useState(null);
 
   const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -233,22 +178,68 @@ function App() {
     setImage(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!problem.trim() && !image) return;
 
     const historyText =
       problem.trim() || "Problème envoyé avec une image";
 
-    const newItem = {
-      id: Date.now(),
-      text: historyText,
-      date: new Date().toLocaleDateString("fr-FR"),
-    };
-
-    setHistory((current) => [newItem, ...current].slice(0, 20));
-    setResponse(getResponse(problem));
     setActiveAction(null);
     setSavedReminder(null);
+    setCopied(false);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          problem: historyText,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur serveur");
+      }
+
+      setResponse({
+        title: "J'ai compris ton problème.",
+        intro: data.answer,
+        steps: [
+          "Comprendre la situation",
+          "Identifier les options possibles",
+          "Passer à l'action",
+        ],
+      });
+
+      const newItem = {
+        id: Date.now(),
+        text: historyText,
+        date: new Date().toLocaleDateString("fr-FR"),
+        answer: data.answer,
+      };
+
+      setHistory((current) => [newItem, ...current].slice(0, 20));
+    } catch (error) {
+      console.error(error);
+
+      setResponse({
+        title: "Débrouille rencontre un problème.",
+        intro:
+          "Je n'arrive pas à contacter mon intelligence artificielle pour le moment. Vérifie que le déploiement Vercel est bien à jour et réessaie.",
+        steps: [
+          "Vérifier la connexion au serveur",
+          "Réessayer",
+          "Vérifier la configuration si le problème continue",
+        ],
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExample = (example) => {
@@ -379,9 +370,11 @@ function App() {
                   <button
                     className="debrouille-button"
                     onClick={handleSubmit}
-                    disabled={!problem.trim() && !image}
+                    disabled={loading || (!problem.trim() && !image)}
                   >
-                    <span>Débrouille-moi ça</span>
+                    <span>
+                      {loading ? "Débrouille réfléchit…" : "Débrouille-moi ça"}
+                    </span>
                     <span className="button-arrow">→</span>
                   </button>
                 </div>
@@ -640,7 +633,19 @@ function App() {
                     key={item.id}
                     onClick={() => {
                       setProblem(item.text);
-                      setResponse(getResponse(item.text));
+
+                      setResponse({
+                        title: "J'ai compris ton problème.",
+                        intro:
+                          item.answer ||
+                          "Voici la réponse précédemment obtenue.",
+                        steps: [
+                          "Comprendre la situation",
+                          "Identifier les options possibles",
+                          "Passer à l'action",
+                        ],
+                      });
+
                       setActiveAction(null);
                       setActiveTab("home");
                     }}
