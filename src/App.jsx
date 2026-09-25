@@ -179,68 +179,100 @@ function App() {
   };
 
   const handleSubmit = async () => {
-    if (!problem.trim() && !image) return;
+  if (!problem.trim() && !image) return;
 
-    const historyText =
-      problem.trim() || "Problème envoyé avec une image";
+  const today = new Date().toISOString().slice(0, 10);
+  const quotaKey = "debrouille_ai_quota";
+
+  const savedQuota = JSON.parse(
+    localStorage.getItem(quotaKey) || '{"date":"","count":0}'
+  );
+
+  if (savedQuota.date !== today) {
+    savedQuota.date = today;
+    savedQuota.count = 0;
+  }
+
+  if (savedQuota.count >= 5) {
+    setResponse({
+      title: "Tu as utilisé tes 5 coups de main.",
+      intro:
+        "La limite gratuite de la bêta est atteinte pour aujourd'hui. Reviens demain pour continuer à utiliser Débrouille.",
+      steps: [
+        "Le quota revient demain",
+        "Tes conversations restent accessibles",
+        "Débrouille continue d'évoluer",
+      ],
+    });
 
     setActiveAction(null);
     setSavedReminder(null);
     setCopied(false);
-    setLoading(true);
+    return;
+  }
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          problem: historyText,
-        }),
-      });
+  const historyText =
+    problem.trim() || "Problème envoyé avec une image";
 
-      const data = await res.json();
+  setActiveAction(null);
+  setSavedReminder(null);
+  setCopied(false);
+  setLoading(true);
 
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur serveur");
-      }
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        problem: historyText,
+      }),
+    });
 
-      setResponse({
-        title: "J'ai compris ton problème.",
-        intro: data.answer,
-        steps: [
-          "Comprendre la situation",
-          "Identifier les options possibles",
-          "Passer à l'action",
-        ],
-      });
+    const data = await res.json();
 
-      const newItem = {
-        id: Date.now(),
-        text: historyText,
-        date: new Date().toLocaleDateString("fr-FR"),
-        answer: data.answer,
-      };
-
-      setHistory((current) => [newItem, ...current].slice(0, 20));
-    } catch (error) {
-      console.error(error);
-
-      setResponse({
-        title: "Débrouille rencontre un problème.",
-        intro:
-  error.message || "Erreur inconnue",
-        steps: [
-          "Vérifier la connexion au serveur",
-          "Réessayer",
-          "Vérifier la configuration si le problème continue",
-        ],
-      });
-    } finally {
-      setLoading(false);
+    if (!res.ok) {
+      throw new Error(data.error || "Erreur serveur");
     }
-  };
+
+    savedQuota.count += 1;
+    localStorage.setItem(quotaKey, JSON.stringify(savedQuota));
+
+    setResponse({
+      title: "J'ai compris ton problème.",
+      intro: data.answer,
+      steps: [
+        "Comprendre la situation",
+        "Identifier les options possibles",
+        "Passer à l'action",
+      ],
+    });
+
+    const newItem = {
+      id: Date.now(),
+      text: historyText,
+      date: new Date().toLocaleDateString("fr-FR"),
+      answer: data.answer,
+    };
+
+    setHistory((current) => [newItem, ...current].slice(0, 20));
+  } catch (error) {
+    console.error(error);
+
+    setResponse({
+      title: "Débrouille rencontre un problème.",
+      intro: error.message || "Erreur inconnue",
+      steps: [
+        "Vérifier la connexion au serveur",
+        "Réessayer",
+        "Vérifier la configuration si le problème continue",
+      ],
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleExample = (example) => {
     setProblem(example);
