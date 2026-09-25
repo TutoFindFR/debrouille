@@ -230,7 +230,7 @@ function App() {
       setResponse({
         title: "Débrouille rencontre un problème.",
         intro:
-          "Je n'arrive pas à contacter mon intelligence artificielle pour le moment. Vérifie que le déploiement Vercel est bien à jour et réessaie.",
+  error.message || "Erreur inconnue",
         steps: [
           "Vérifier la connexion au serveur",
           "Réessayer",
