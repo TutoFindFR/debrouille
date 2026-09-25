@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 const examples = [
@@ -136,6 +136,7 @@ function getActionContent(action, problem) {
 }
 
 function App() {
+  const [geminiRetryAfter, setGeminiRetryAfter] = useState(0);
   const [problem, setProblem] = useState("");
   const [response, setResponse] = useState(null);
   const [history, setHistory] = useState([]);
@@ -177,7 +178,22 @@ function App() {
 
     setImage(null);
   };
+useEffect(() => {
+  if (geminiRetryAfter <= 0) return;
 
+  const timer = setInterval(() => {
+    setGeminiRetryAfter((current) => {
+      if (current <= 1) {
+        clearInterval(timer);
+        return 0;
+      }
+
+      return current - 1;
+    });
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [geminiRetryAfter]);
   const handleSubmit = async () => {
   if (!problem.trim() && !image) return;
 
@@ -230,11 +246,35 @@ function App() {
       }),
     });
 
-    const data = await res.json();
+   const data = await res.json();
 
-    if (!res.ok) {
-      throw new Error(data.error || "Erreur serveur");
-    }
+if (!res.ok) {
+  if (res.status === 429) {
+  setGeminiRetryAfter(data.retryAfter || 60);
+
+  setResponse({
+    title: "Débrouille est momentanément très sollicité.",
+    intro: (
+      <>
+        L'IA est temporairement limitée. Nouvelle demande possible dans{" "}
+        <strong>{geminiRetryAfter || data.retryAfter || 60}s</strong>.
+      </>
+    ),
+    steps: [
+      "Attendre la fin du délai",
+      "Relancer ta demande",
+      "Ta demande quotidienne n'est pas consommée",
+    ],
+  });
+
+  setActiveAction(null);
+  setSavedReminder(null);
+  setCopied(false);
+  return;
+}
+
+  throw new Error(data.error || "Erreur serveur");
+}
 
     savedQuota.count += 1;
     localStorage.setItem(quotaKey, JSON.stringify(savedQuota));
@@ -402,7 +442,11 @@ function App() {
                   <button
                     className="debrouille-button"
                     onClick={handleSubmit}
-                    disabled={loading || (!problem.trim() && !image)}
+                    disabled={
+  loading ||
+  geminiRetryAfter > 0 ||
+  (!problem.trim() && !image)
+}
                   >
                     <span>
                       {loading ? "Débrouille réfléchit…" : "Débrouille-moi ça"}

@@ -77,11 +77,14 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return res.status(429).json({
-          error:
-            "Débrouille est momentanément très sollicité. Réessaie dans quelques secondes.",
-        });
-      }
+  const retryMatch = data?.error?.message?.match(/retry in (\d+)s/i);
+  const retryAfter = retryMatch ? Number(retryMatch[1]) : 60;
+
+  return res.status(429).json({
+    error: "Débrouille est momentanément très sollicité.",
+    retryAfter,
+  });
+}
 
       throw new Error(
         data?.error?.message || "Erreur lors de l'appel à Gemini"
